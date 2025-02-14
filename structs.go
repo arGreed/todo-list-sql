@@ -22,3 +22,8 @@ type User struct {
 	Email    string `gorm:"column:email"`
 	Password string `gorm:"column:password"`
 }
+
+type Login struct {
+	LoginPrm string `form:"identifier" binding:"required"`
+	Password string `form:"password" binding:"required"`
+}

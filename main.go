@@ -28,8 +28,10 @@ func main() {
 	}
 
 	router.GET(pingRoute, ping)
-
+	router.GET("/", showIndex)
 	router.GET(registerRoute, showReregister)
+	router.GET(loginRoute, showLogin)
+	router.POST(loginRoute, login(db))
 	router.POST(registerRoute, register(db))
 
 	router.Run(":8081")
