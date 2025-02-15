@@ -44,8 +44,19 @@
 <body>
 	<div class="main-container">
 		<h1>Перечень заметок</h1>
-		<button onclick="window.location.href='/register'">Регистрация</button>
-		<button onclick="window.location.href='/login'">Вход</button>
+		
+		{{ if .isAuthenticated }}
+			<button onclick="window.location.href='/note/add'">Добавить заметку</button>
+			<button 
+				onclick="window.location.href='/logout'" 
+				style="background-color: #ff4444; margin-top: 20px;"
+			>
+				Выйти
+			</button>
+		{{ else }}
+			<button onclick="window.location.href='/register'">Регистрация</button>
+			<button onclick="window.location.href='/login'">Вход</button>
+		{{ end }}
 	</div>
 </body>
 </html>

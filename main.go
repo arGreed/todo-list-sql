@@ -26,6 +26,7 @@ func main() {
 		log.Println("Ошибка инициализации базы данных:", err)
 		return
 	}
+	router.Use(AuthMiddleware())
 
 	router.GET(pingRoute, ping)
 	router.GET("/", showIndex)
@@ -33,6 +34,13 @@ func main() {
 	router.GET(loginRoute, showLogin)
 	router.POST(loginRoute, login(db))
 	router.POST(registerRoute, register(db))
+	router.GET(logoutRoute, logout)
+
+	protected := router.Group("/")
+	protected.Use(StrictAuthMiddleware())
+	{
+		protected.GET(addNoteTypeRoute, showAddNoteType)
+	}
 
 	router.Run(":8081")
 }

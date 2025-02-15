@@ -4,21 +4,27 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 var (
-	pingRoute     string = "/ping"
-	registerRoute string = "/register"
-	loginRoute    string = "/login"
+	pingRoute        string = "/ping"
+	registerRoute    string = "/register"
+	loginRoute       string = "/login"
+	addNoteTypeRoute string = "/note/add"
+	logoutRoute      string = "/logout"
 )
 
 var (
 	userTab string = "to_do_list.user"
 )
+
+var jwtSecret = []byte("ergoipahmjn-weomfwep4oghjmethomer[gp]")
 
 /*
 ? Маршрут для проверки соединения;
@@ -82,11 +88,83 @@ func register(db *gorm.DB) func(c *gin.Context) {
 }
 
 func showIndex(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.html", nil)
+	userId, exists := c.Get("userId")
+	isAuthenticated := exists && userId != nil
+	log.Printf("Рендеринг главной страницы. Auth: %v, UserID: %v", isAuthenticated, userId)
+
+	c.HTML(http.StatusOK, "index.html", gin.H{
+		"isAuthenticated": isAuthenticated,
+	})
 }
 
 func showLogin(c *gin.Context) {
 	c.HTML(http.StatusOK, "login.html", nil)
+}
+
+func generateToken(user uint, role int8) string {
+	claims := jwt.MapClaims{}
+
+	claims["authorized"] = true
+	claims["userId"] = user
+	claims["role"] = role
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return ""
+	}
+	return tokenString
+}
+
+func AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString, err := c.Cookie("auth_token")
+		if err != nil {
+			log.Println("Кука auth_token отсутствует")
+			c.Next()
+			return
+		}
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("неверный метод подписи")
+			}
+			return jwtSecret, nil
+		})
+
+		if err != nil {
+			log.Println("Ошибка парсинга токена:", err)
+			c.Next()
+			return
+		}
+
+		if !token.Valid {
+			log.Println("Токен невалиден")
+			c.Next()
+			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			log.Printf("Успешная аутентификация. UserID: %v", claims["userId"])
+			c.Set("userId", claims["userId"])
+			c.Set("role", claims["role"])
+		}
+
+		c.Next()
+	}
+}
+
+func StrictAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, exists := c.Get("userId"); !exists {
+			c.Redirect(http.StatusSeeOther, "/login")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 func login(db *gorm.DB) func(c *gin.Context) {
@@ -118,6 +196,46 @@ func login(db *gorm.DB) func(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Пароли не совпадают"})
 			return
 		}
+
+		token := generateToken(user.Id, user.Role)
+		if token == "" {
+			log.Println("Ошибка генерации токена")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка генерации токена"})
+			return
+		}
+
+		c.SetCookie(
+			"auth_token",
+			token,
+			3600*24,
+			"/",
+			"",
+			false,
+			true,
+		)
+
 		c.Redirect(http.StatusSeeOther, "/")
 	}
 }
+
+func logout(c *gin.Context) {
+	c.SetCookie(
+		"auth_token",
+		"",
+		-1,
+		"/",
+		"",
+		false,
+		true,
+	)
+
+	c.Redirect(http.StatusSeeOther, "/")
+}
+
+func showAddNoteType(c *gin.Context) {
+	c.HTML(http.StatusOK, "addNoteType.html", nil)
+}
+
+//func addNoteType(db *gorm.DB) func(c *gin.Context) {
+//	return func(c *gin.Context)
+//}
