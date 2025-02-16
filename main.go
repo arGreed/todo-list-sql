@@ -29,17 +29,20 @@ func main() {
 	router.Use(AuthMiddleware())
 
 	router.GET(pingRoute, ping)
-	router.GET("/", showIndex)
+	router.GET(rootRoute, showIndex)
 	router.GET(registerRoute, showReregister)
 	router.GET(loginRoute, showLogin)
 	router.POST(loginRoute, login(db))
 	router.POST(registerRoute, register(db))
 	router.GET(logoutRoute, logout)
 
-	protected := router.Group("/")
+	protected := router.Group(rootRoute)
 	protected.Use(StrictAuthMiddleware())
 	{
 		protected.GET(addNoteTypeRoute, showAddNoteType)
+		protected.POST(addNoteTypeRoute, addNoteType(db))
+		protected.GET(addNoteRoute, showAddNote(db))
+		protected.POST(addNoteRoute, addNote(db))
 	}
 
 	router.Run(":8081")

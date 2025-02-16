@@ -46,6 +46,7 @@
 		<h1>Перечень заметок</h1>
 		
 		{{ if .isAuthenticated }}
+			<button onclick="window.location.href='/noteType/add'">Добавить тип заметок</button>
 			<button onclick="window.location.href='/note/add'">Добавить заметку</button>
 			<button 
 				onclick="window.location.href='/logout'" 

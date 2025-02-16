@@ -13,15 +13,18 @@ import (
 )
 
 var (
+	rootRoute        string = "/"
 	pingRoute        string = "/ping"
 	registerRoute    string = "/register"
 	loginRoute       string = "/login"
-	addNoteTypeRoute string = "/note/add"
+	addNoteTypeRoute string = "/noteType/add"
 	logoutRoute      string = "/logout"
+	addNoteRoute     string = "/note/add"
 )
 
 var (
-	userTab string = "to_do_list.user"
+	userTab     string = "to_do_list.user"
+	noteTypeTab string = "to_do_list.note_type"
 )
 
 var jwtSecret = []byte("ergoipahmjn-weomfwep4oghjmethomer[gp]")
@@ -83,7 +86,7 @@ func register(db *gorm.DB) func(c *gin.Context) {
 			return
 		}
 
-		c.Redirect(http.StatusSeeOther, "/")
+		c.Redirect(http.StatusSeeOther, rootRoute)
 	}
 }
 
@@ -147,9 +150,10 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			log.Printf("Успешная аутентификация. UserID: %v", claims["userId"])
-			c.Set("userId", claims["userId"])
-			c.Set("role", claims["role"])
+			if userId, ok := claims["userId"].(float64); ok {
+				c.Set("userId", uint(userId))
+				c.Set("role", int8(claims["role"].(float64)))
+			}
 		}
 
 		c.Next()
@@ -214,7 +218,7 @@ func login(db *gorm.DB) func(c *gin.Context) {
 			true,
 		)
 
-		c.Redirect(http.StatusSeeOther, "/")
+		c.Redirect(http.StatusSeeOther, rootRoute)
 	}
 }
 
@@ -223,19 +227,75 @@ func logout(c *gin.Context) {
 		"auth_token",
 		"",
 		-1,
-		"/",
+		rootRoute,
 		"",
 		false,
 		true,
 	)
 
-	c.Redirect(http.StatusSeeOther, "/")
+	c.Redirect(http.StatusSeeOther, rootRoute)
 }
 
 func showAddNoteType(c *gin.Context) {
 	c.HTML(http.StatusOK, "addNoteType.html", nil)
 }
 
-//func addNoteType(db *gorm.DB) func(c *gin.Context) {
-//	return func(c *gin.Context)
-//}
+func addNoteType(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var noteType NoteType
+		err := c.ShouldBind(&noteType)
+		if err != nil {
+			log.Println("Ошибка получения текста типа заметки, ", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения названия типа заметки"})
+			return
+		}
+		user, exists := c.Get("userId")
+		if !exists {
+			log.Println("Пользователь не определён")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Пользователь не определён"})
+			return
+		}
+		noteType.Author = user.(uint)
+
+		result := db.Table(noteTypeTab).Create(&noteType)
+		if result.Error != nil {
+			log.Println("Ошибка создания типа заметки: ", result.Error)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка создания нового типа заметки"})
+			return
+		}
+
+		c.Redirect(http.StatusSeeOther, rootRoute)
+	}
+}
+
+func showAddNote(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var types []NoteType
+		user, exists := c.Get("userId")
+		if !exists {
+			log.Println("Пользователь не определён")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Пользователь не определён"})
+			return
+		}
+		userId := user.(uint)
+
+		result := db.Table(noteTypeTab).Where("creator_id = ?", userId).Find(&types)
+
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				log.Println("Ошибка работы с бд: ", result.Error)
+				c.JSON(http.StatusNoContent, gin.H{"error": "Не существует типов заметок"})
+				return
+			}
+			log.Println("Ошибка работы с БД:", result.Error)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка работы с БД"})
+			return
+		}
+
+		c.HTML(http.StatusOK, "createNote.html", gin.H{
+			"NoteTypes": types,
+		})
+	}
+}
+
+func addNote()

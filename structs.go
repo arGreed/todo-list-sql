@@ -27,3 +27,9 @@ type Login struct {
 	LoginPrm string `form:"identifier" binding:"required"`
 	Password string `form:"password" binding:"required"`
 }
+
+type NoteType struct {
+	Id     uint   `gorm:"column:id"`
+	Text   string `form:"noteType" binding:"required" gorm:"column:name"`
+	Author uint   `gorm:"column:creator_id"`
+}
