@@ -20,11 +20,14 @@ var (
 	addNoteTypeRoute string = "/noteType/add"
 	logoutRoute      string = "/logout"
 	addNoteRoute     string = "/note/add"
+	allNotesRoute    string = "/note/all"
+	changeNoteStat   string = "/note/toggle"
 )
 
 var (
 	userTab     string = "to_do_list.user"
 	noteTypeTab string = "to_do_list.note_type"
+	noteTab     string = "to_do_list.note"
 )
 
 var jwtSecret = []byte("ergoipahmjn-weomfwep4oghjmethomer[gp]")
@@ -298,4 +301,102 @@ func showAddNote(db *gorm.DB) func(c *gin.Context) {
 	}
 }
 
-func addNote()
+func addNote(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var input struct {
+			Content    string `form:"content" binding:"required"`
+			NoteTypeID uint   `form:"note_type_id" binding:"required"`
+		}
+
+		err := c.ShouldBind(&input)
+		if err != nil {
+			log.Println("Получены некорректные данные:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Получены некорректные данные"})
+			return
+		}
+		user, exists := c.Get("userId")
+		if !exists {
+			log.Println("Пользователь не определён")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Пользователь не определён"})
+			return
+		}
+		note := Note{
+			Text:        input.Content,
+			Type:        input.NoteTypeID,
+			Creator:     user.(uint),
+			IsCompleted: false, // Значение по умолчанию
+		}
+		result := db.Table(noteTab).Create(&note)
+		if result.Error != nil {
+			log.Println("Ошибка создания заметки")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка создания заметки"})
+			return
+		}
+
+		c.Redirect(http.StatusSeeOther, rootRoute)
+	}
+}
+
+func showAllNotes(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var notes []Note
+		user, exists := c.Get("userId")
+		if !exists {
+			log.Println("Пользователь не определён")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Пользователь не определён"})
+			return
+		}
+		userId := user.(uint)
+		result := db.Table(noteTab).Where("creator_id = ? and is_completed = false", userId).Find(&notes)
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				log.Println("Пользователь не создал ни одной задачи")
+				c.JSON(http.StatusNoContent, gin.H{"error": "Пользователь не создавал задач"})
+				return
+			}
+			log.Println("Ошибка при работе с базой данных:", result.Error)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка работы с бд"})
+			return
+		}
+		fmt.Println(notes)
+
+		c.HTML(http.StatusOK, "notes.html", gin.H{
+			"Notes": notes,
+		})
+	}
+}
+
+func toggleNoteStatus(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		user, exists := c.Get("userId")
+		if !exists {
+			log.Println("Пользователь не определён")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Пользователь не определён"})
+			return
+		}
+		userId := user.(uint)
+		var formInput FormInput
+		err := c.ShouldBind(&formInput)
+		if err != nil {
+			log.Println("Получены некорректные данные:", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err}) //"Получены некорректные данные"})
+			return
+		}
+
+		isCompleted := formInput.IsCompleted == "on"
+
+		result := db.Table(noteTab).Where("id = ? AND creator_id = ?", formInput.Id, userId).Update("is_completed", isCompleted)
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				log.Println("Задача не найдена")
+				c.JSON(http.StatusNoContent, gin.H{"error": "Пользователь не создавал задач"})
+				return
+			}
+			log.Println("Ошибка при работе с базой данных:", result.Error)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка работы с бд"})
+			return
+		}
+
+		c.Redirect(http.StatusSeeOther, rootRoute)
+	}
+}

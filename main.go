@@ -43,6 +43,8 @@ func main() {
 		protected.POST(addNoteTypeRoute, addNoteType(db))
 		protected.GET(addNoteRoute, showAddNote(db))
 		protected.POST(addNoteRoute, addNote(db))
+		protected.GET(allNotesRoute, showAllNotes(db))
+		router.POST(changeNoteStat, toggleNoteStatus(db))
 	}
 
 	router.Run(":8081")

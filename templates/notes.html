@@ -1,0 +1,45 @@
+<!-- 4. Упрощенный шаблон notes.html -->
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Мои задачи</title>
+	<style>
+		.note {
+			padding: 10px;
+			margin: 5px 0;
+			border: 1px solid #ccc;
+			display: flex;
+			align-items: center;
+		}
+		.completed {
+			background-color: #e0ffe0;
+		}
+		.status-checkbox {
+			margin-right: 15px;
+		}
+		.task-text {
+			flex-grow: 1;
+		}
+	</style>
+</head>
+<body>
+	<h1>Мои задачи</h1>
+		
+	{{if .Notes}}
+		{{range .Notes}}
+		<div class="note {{if .IsCompleted}}completed{{end}}">
+			<form class="status-checkbox" method="POST" action="/note/toggle">
+				<input type="hidden" name="note_id" value="{{.Id}}">
+				<input type="checkbox" 
+						name="is_completed" 
+						{{if .IsCompleted}}checked{{end}}
+						onchange="this.form.submit()">
+			</form>
+			<div class="task-text">{{.Text}}</div>
+		</div>
+		{{end}}
+	{{else}}
+		<p>Нет активных задач</p>
+	{{end}}
+</body>
+</html>
